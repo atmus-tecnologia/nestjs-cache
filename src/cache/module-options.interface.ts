@@ -10,6 +10,7 @@ export interface CacheModuleOptionsFactory {
 export interface CacheModuleAsyncOptions
   extends Pick<ModuleMetadata, 'imports'> {
   useClass?: Type<CacheModuleOptionsFactory>;
+  useExisting?: Type<CacheModuleOptionsFactory>;
   useFactory?: (
     ...args: any[]
   ) => Promise<CacheModuleOptions> | CacheModuleOptions;

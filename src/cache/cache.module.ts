@@ -4,6 +4,7 @@ import { CACHE_CONFIG_OPTIONS } from './constants';
 import {
   CacheModuleAsyncOptions,
   CacheModuleOptions,
+  CacheModuleOptionsFactory,
 } from './module-options.interface';
 
 @Global()
@@ -36,12 +37,14 @@ export class CacheModule {
   private static createAsyncProviders(
     options: CacheModuleAsyncOptions,
   ): Provider[] {
+    if (options.useFactory) {
+      return [{ provide: CACHE_CONFIG_OPTIONS, useFactory: options.useFactory, inject: options.inject || [] }];
+    }
+    const factory = options.useClass || options.useExisting;
+    if (!factory) throw new Error('CacheModule.registerAsync requires useFactory, useClass or useExisting');
     return [
-      {
-        provide: CACHE_CONFIG_OPTIONS,
-        useFactory: options.useFactory,
-        inject: options.inject || [],
-      },
+      ...(options.useClass ? [options.useClass] : []),
+      { provide: CACHE_CONFIG_OPTIONS, useFactory: (instance: CacheModuleOptionsFactory) => instance.createCacheOptions(), inject: [factory] },
     ];
   }
 }

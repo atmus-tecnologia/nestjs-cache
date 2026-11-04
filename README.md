@@ -1,88 +1,81 @@
-<h1 align="center"></h1>
+# @atmus/nestjs-cache
 
-<div align="center">
-  <a href="http://nestjs.com/" target="_blank">
-    <img src="https://nestjs.com/img/logo_text.svg" width="150" alt="Nest Logo" />
-  </a>
-</div>
+Redis helpers for NestJS powered by ioredis, with parameter-derived keys, SCAN and connection cleanup.
 
-<h3 align="center">NestJS OpenAI</h3>
+## Installation
 
----
-
-# Features
-
-- Configure and inject the OpenAI API client.
-
-# Installation
-
-```
-yarn add @atmus/nestjs-openai
+```sh
+npm install @atmus/nestjs-cache @nestjs/common reflect-metadata rxjs
 ```
 
-# Usage
+Use the same Nest major as your application. Upgrading from a previous release? Read [MIGRATION.md](MIGRATION.md) first.
 
-## Settings
+## Configuration
 
-### `OpenAIModule.register`
-
-Import the module at your module. Configure the OpenAI API client.
-
-```typescript
-import { OpenAIModule } from "@atmus/nestjs-openai";
+```ts
+import { Module } from '@nestjs/common';
+import { CacheModule } from '@atmus/nestjs-cache';
 
 @Module({
-  imports: [
-    OpenAIModule.register({
-      apiKey: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    }),
-  ],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [CacheModule.register({ host: process.env.REDIS_HOST || '127.0.0.1', port: 6379 })],
 })
 export class AppModule {}
 ```
 
-### `OpenAIModule.registerAsync`
+Load REDIS_HOST before registering the module. Never commit API keys or passwords.
+For asynchronous configuration:
 
-You can also use `OpenAIModule.registerAsync` to configure it asynchronously.
-This way you can hide your api key from the code. It's recommended to use this method.
-
-```typescript
-import { OpenAIModule } from "@atmus/nestjs-openai";
-
-@Module({
-  imports: [
-    OpenAIModule.registerAsync({
-      useFactory: (config: ConfigService<EnvVars>) => ({
-        apiKey: config.get("OPENAI_API_KEY"),
-      }),
-      inject: [ConfigService],
-    }),
-  ],
-  controllers: [AppController],
-  providers: [AppService],
+```ts
+CacheModule.registerAsync({
+  useFactory: async () => ({ host: process.env.REDIS_HOST || '127.0.0.1', port: 6379 }),
 })
-export class AppModule {}
 ```
 
-## Inject `OpenAIService`
+`useClass` and `useExisting` are also supported; factories implement `createCacheOptions()`.
 
-Inject `OpenAIService` anywhere. Injected service is identical to OpenAI API client.
+## Usage and API
 
-```typescript
+```ts
+import { Injectable } from '@nestjs/common';
+import { CacheService } from '@atmus/nestjs-cache';
+
 @Injectable()
-export class TextCompletionService {
-  constructor(private readonly openai: OpenAIService) {}
+export class UsersCache {
+  constructor(private readonly cache: CacheService) {}
 
-  async completion(
-    messages: CreateChatCompletionRequest["messages"],
-  ): Promise<string> {
-    const { data } = await this.openai.createCompletion({
-      model: "davinci",
-      prompt: "This is a test",
-    });
-    return data.choices[0].text;
+  async remember() {
+    await this.cache.set('user:1', JSON.stringify({ id: 1 }), 'EX', 60);
+    return this.cache.get('user:1');
   }
 }
 ```
+
+| Method | Result / behavior |
+| --- | --- |
+| set(key, value, option?, optionValue?) | Promise<string or null>; Redis SET options, EX in seconds / PX in milliseconds |
+| get(key) | Promise<string or null> |
+| del(key) | Promise<number> removed keys |
+| setFromParams(key, params, value, option?, optionValue?) | SET using a SHA-256 hash of JSON.stringify(params) |
+| getFromParams(key, params) / delFromParams(key, params) | Same parameter-derived key |
+| getKeys(pattern) | Promise<string[]> using SCAN; unique keys, unspecified order |
+| delFromPattern(pattern) | Promise<void>; awaits batched deletions, not atomic |
+| client | Owned ioredis client for other commands |
+
+Use JSON-serializable parameters in consistent property order. Hashing is for key generation, not encryption. SCAN is not a snapshot during concurrent writes. Values remain strings; serialization belongs to the caller. This package does not implement cache-manager or Nest's CacheInterceptor.
+
+The module is global and owns its connection. Enable `app.enableShutdownHooks()` to close it on OS signals; `app.close()` also disconnects it. Configure TLS, password and retry behavior through native RedisOptions. Public exports include module option/factory types and CACHE_CONFIG_OPTIONS.
+
+
+## Compatibility and development
+
+Requires **Node.js 22.12+**, **NestJS 11 or 12**, RxJS 7.8+ and reflect-metadata 0.2.2+.
+The package ships CommonJS JavaScript, TypeScript declarations and source maps. Modern Node supports loading NestJS 12's ESM dependencies; use a compatible NodeNext/Node20 TypeScript configuration in consuming applications.
+
+```sh
+npm ci
+npm run check
+```
+
+Checks include offline regression tests and installation of the actual npm archive in an isolated consumer. CI covers Node 22/24 and Nest 11/12. No real API credentials are used by the test suite. Live provider behavior must be validated in your application.
+
+See [CHANGELOG.md](CHANGELOG.md), [MIGRATION.md](MIGRATION.md) and [CONTRIBUTING.md](CONTRIBUTING.md) for release history, breaking changes and publication instructions. Licensed under [MIT](LICENSE).
