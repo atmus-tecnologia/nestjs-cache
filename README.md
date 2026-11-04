@@ -4,10 +4,8 @@ Redis helpers for NestJS powered by ioredis, with parameter-derived keys, SCAN a
 
 ## Installation
 
-Version 1.0.0 is distributed through GitHub Releases. It has not been published to npm yet; use the archive URL below.
-
 ```sh
-npm install https://github.com/atmus-tecnologia/nestjs-cache/releases/download/v1.0.0/atmus-nestjs-cache-1.0.0.tgz @nestjs/common reflect-metadata rxjs
+npm install @atmus/nestjs-cache@1.0.0 @nestjs/common reflect-metadata rxjs
 ```
 
 Use the same Nest major as your application. Upgrading from a previous release? Read [MIGRATION.md](MIGRATION.md) first.
